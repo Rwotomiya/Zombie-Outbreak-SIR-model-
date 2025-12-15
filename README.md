@@ -54,6 +54,8 @@ streamlit run zombie_sim.py
 ```
 
 This will automatically open the application in your default web browser (usually at `http://localhost:8501`).
+<img width="1919" height="883" alt="Screenshot 2025-12-15 091242" src="https://github.com/user-attachments/assets/d850345c-9cc1-4b75-ba2a-2823e7266da8" />
+
 
 ## 🧠 Understanding the Parameters
 
