@@ -4,70 +4,93 @@ import numpy as np
 
 # --- 1. SET UP THE INTERFACE ---
 st.title("🧟 Interactive Zombie Outbreak Simulator")
-st.write("""
-Adjust the parameters in the **sidebar** to see how the virus spreads.
-Can you flatten the curve?
+st.markdown("""
+Adjust the parameters to see how the virus spreads.
+**New:** Use the **Vaccine Slider** to see if you can achieve Herd Immunity!
 """)
 
 # --- 2. THE SIDEBAR (User Inputs) ---
 st.sidebar.header("Simulation Parameters")
 
-# Sliders for the user to tweak variables
+# Basic Population
 N = st.sidebar.number_input("Total Population (N)", value=1000, step=100)
 I0 = st.sidebar.number_input("Initial Zombies (I0)", value=1, step=1)
-days = st.sidebar.slider("Duration (Days)", min_value=10, max_value=365, value=100)
+days = st.sidebar.slider("Duration (Days)", 10, 365, 100)
 
-st.sidebar.markdown("---") # Separator line
+st.sidebar.markdown("---")
 
-# The Rates (The most important sliders)
-beta = st.sidebar.slider("Infection Rate (Beta)", min_value=0.0, max_value=1.0, value=0.3, step=0.01)
-gamma = st.sidebar.slider("Recovery Rate (Gamma)", min_value=0.0, max_value=1.0, value=0.1, step=0.01)
+# The Rates
+beta = st.sidebar.slider("Infection Rate (Beta)", 0.0, 1.0, 0.3, 0.01)
+gamma = st.sidebar.slider("Recovery Rate (Gamma)", 0.0, 1.0, 0.1, 0.01)
 
-# Display R0 (Reproduction Number)
-if gamma > 0:
-    r0_val = beta / gamma
-    st.sidebar.write(f"**R0 (Reproduction Number):** {r0_val:.2f}")
-    if r0_val < 1:
-        st.sidebar.success("The outbreak will die out!")
-    else:
-        st.sidebar.error("The outbreak will grow!")
+st.sidebar.markdown("---")
 
-# --- 3. RUN THE SIMULATION (The Engine) ---
+# --- NEW FEATURE: VACCINATION ---
+st.sidebar.header("💉 Prevention")
+vaccine_pct = st.sidebar.slider("Percentage Vaccinated", 0, 100, 0)
+vaccine_efficency = 1.0 # Assuming 100% effective for simplicity
 
-# Initialize variables based on user input
-S, I, R = N - I0, I0, 0
-S_list, I_list, R_list = [S], [I], [R]
+# --- 3. MATH & LOGIC ---
 
-# The Math Loop
+# Calculate Initial Numbers
+# Vaccinated people are removed from Susceptible immediately
+vaccinated_count = int(N * (vaccine_pct / 100))
+S0 = N - I0 - vaccinated_count
+I = I0
+R = vaccinated_count # Vaccinated people start as "Recovered/Immune"
+
+# Safety check: If we vaccinated more people than exist
+if S0 < 0:
+    S0 = 0
+
+# Lists to store history
+S_list, I_list, R_list = [S0], [I], [R]
+
+# The Simulation Loop
 for _ in range(days):
+    # Current Susceptible
+    S = S_list[-1]
+    
     new_infections = (beta * S * I) / N
     new_recoveries = gamma * I
     
-    S = S - new_infections
-    I = I + new_infections - new_recoveries
-    R = R + new_recoveries
+    S_new = S - new_infections
+    I_new = I + new_infections - new_recoveries
+    R_new = R + new_recoveries
     
-    # Clip values to ensure they don't go below 0
-    S, I, R = max(S, 0), max(I, 0), max(R, 0)
+    # Clip to 0 to prevent negative numbers
+    S_new, I_new, R_new = max(S_new, 0), max(I_new, 0), max(R_new, 0)
     
-    S_list.append(S)
-    I_list.append(I)
-    R_list.append(R)
+    # Update lists
+    S_list.append(S_new)
+    I_list.append(I_new)
+    R_list.append(R_new)
+    
+    # Update current values for next loop
+    S, I, R = S_new, I_new, R_new
 
 # --- 4. VISUALIZATION ---
 
-# Convert data to a DataFrame (Table) for easy charting
+# Create Data Table
 chart_data = pd.DataFrame({
-    "Susceptible": S_list,
-    "Infected": I_list,
-    "Recovered": R_list
+    "Susceptible (Healthy)": S_list,
+    "Infected (Zombies)": I_list,
+    "Recovered / Immune": R_list
 })
 
-# Create an interactive Line Chart
+# Display Metrics at the top
+col1, col2, col3, col4 = st.columns(4)
+col1.metric("Total Population", int(N))
+col2.metric("Vaccinated Start", vaccinated_count)
+col3.metric("Peak Infections", int(max(I_list)))
+col4.metric("Total Deaths/Recoveries", int(R_list[-1]))
+
+# Interactive Chart
 st.line_chart(chart_data)
 
-# Show final stats
-col1, col2, col3 = st.columns(3)
-col1.metric("Healthy Left", int(S))
-col2.metric("Peak Zombies", int(max(I_list)))
-col3.metric("Total Recovered/Dead", int(R))
+# Show R0 Logic
+if gamma > 0:
+    r0 = beta / gamma
+    herd_immunity_threshold = 1 - (1/r0)
+    
+    st.info(f"**Math Fact:** With an R0 of {r0:.2f}, you need to vaccinate **{herd_immunity_threshold*100:.1f}%** of the population to stop the spread instantly.")
